@@ -155,8 +155,8 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
       [self shareText:shareText
                  subject:shareSubject
           withController:topViewController
-                atSource:originRect];
-      result(nil);
+                atSource:originRect
+               result:result];
     } else if ([@"shareFiles" isEqualToString:call.method]) {
       NSArray *paths = arguments[@"paths"];
       NSArray *mimeTypes = arguments[@"mimeTypes"];
@@ -186,8 +186,8 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
              withSubject:subject
                 withText:text
           withController:topViewController
-                atSource:originRect];
-      result(nil);
+              atSource:originRect
+                result:result];
     } else {
       result(FlutterMethodNotImplemented);
     }
@@ -196,25 +196,40 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
 
 + (void)share:(NSArray *)shareItems
     withController:(UIViewController *)controller
-          atSource:(CGRect)origin {
+          atSource:(CGRect)origin
+       result:(FlutterResult)result {
   UIActivityViewController *activityViewController =
       [[UIActivityViewController alloc] initWithActivityItems:shareItems applicationActivities:nil];
   activityViewController.popoverPresentationController.sourceView = controller.view;
   if (!CGRectIsEmpty(origin)) {
     activityViewController.popoverPresentationController.sourceRect = origin;
   }
+  
+  __weak UIActivityViewController *tmp =  activityViewController;
+  activityViewController.completionWithItemsHandler = ^(
+                                                        UIActivityType __nullable activityType,
+                                                        BOOL completed,
+                                                        NSArray * __nullable returnedItems,
+                                                        NSError * __nullable activityError
+                                                        )
+  {
+    tmp.completionWithItemsHandler = nil;
+    result([NSNumber numberWithBool:completed]);
+  };
+  
   [controller presentViewController:activityViewController animated:YES completion:nil];
 }
 
 + (void)shareText:(NSString *)shareText
            subject:(NSString *)subject
     withController:(UIViewController *)controller
-          atSource:(CGRect)origin {
+          atSource:(CGRect)origin
+            result:(FlutterResult) result{
   NSObject *data = [[NSURL alloc] initWithString:shareText];
   if (data == nil) {
     data = [[SharePlusData alloc] initWithSubject:subject text:shareText];
   }
-  [self share:@[ data ] withController:controller atSource:origin];
+  [self share:@[ data ] withController:controller atSource:origin result:result];
 }
 
 + (void)shareFiles:(NSArray *)paths
@@ -222,7 +237,8 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
        withSubject:(NSString *)subject
           withText:(NSString *)text
     withController:(UIViewController *)controller
-          atSource:(CGRect)origin {
+          atSource:(CGRect)origin
+            result:(FlutterResult) result {
   NSMutableArray *items = [[NSMutableArray alloc] init];
 
   if (text || subject) {
@@ -247,7 +263,7 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
     }
   }
 
-  [self share:items withController:controller atSource:origin];
+  [self share:items withController:controller atSource:origin result:result];
 }
 
 @end
