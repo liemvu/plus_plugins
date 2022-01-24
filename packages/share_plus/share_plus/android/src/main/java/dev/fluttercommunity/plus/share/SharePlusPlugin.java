@@ -16,6 +16,7 @@ public class SharePlusPlugin implements FlutterPlugin, ActivityAware {
   private static final String CHANNEL = "dev.fluttercommunity.plus/share";
   private Share share;
   private MethodChannel methodChannel;
+  private ActivityPluginBinding binding;
 
   @Override
   public void onAttachedToEngine(FlutterPluginBinding binding) {
@@ -35,11 +36,14 @@ public class SharePlusPlugin implements FlutterPlugin, ActivityAware {
   @Override
   public void onAttachedToActivity(ActivityPluginBinding binding) {
     share.setActivity(binding.getActivity());
+    binding.addActivityResultListener(share);
+    this.binding = binding;
   }
 
   @Override
   public void onDetachedFromActivity() {
     share.setActivity(null);
+    binding.removeActivityResultListener(share);
   }
 
   @Override

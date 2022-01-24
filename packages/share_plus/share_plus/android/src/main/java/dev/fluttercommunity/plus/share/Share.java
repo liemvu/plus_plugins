@@ -10,7 +10,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Build;
+
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,13 +24,17 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Handles share intent. */
-class Share {
+import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugin.common.PluginRegistry;
 
+/** Handles share intent. */
+class Share implements PluginRegistry.ActivityResultListener {
+  public static int REQUEST_CODE = 5001;
   private final Context context;
   private Activity activity;
 
   private final String providerAuthority;
+  MethodChannel.Result pendingResult;
 
   /**
    * Constructs a Share object. The {@code context} and {@code activity} are used to start the share
@@ -49,7 +56,7 @@ class Share {
     this.activity = activity;
   }
 
-  void share(String text, String subject) {
+  void share(String text, String subject, MethodChannel.Result result) {
     if (text == null || text.isEmpty()) {
       throw new IllegalArgumentException("Non-empty text expected");
     }
@@ -60,10 +67,10 @@ class Share {
     shareIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
     shareIntent.setType("text/plain");
     Intent chooserIntent = Intent.createChooser(shareIntent, null /* dialog title optional */);
-    startActivity(chooserIntent);
+    startActivity(chooserIntent, result);
   }
 
-  void shareFiles(List<String> paths, List<String> mimeTypes, String text, String subject)
+  void shareFiles(List<String> paths, List<String> mimeTypes, String text, String subject, MethodChannel.Result result)
       throws IOException {
     if (paths == null || paths.isEmpty()) {
       throw new IllegalArgumentException("Non-empty path expected");
@@ -74,7 +81,7 @@ class Share {
 
     Intent shareIntent = new Intent();
     if (fileUris.isEmpty()) {
-      share(text, subject);
+      share(text, subject, result);
       return;
     } else if (fileUris.size() == 1) {
       shareIntent.setAction(Intent.ACTION_SEND);
@@ -106,15 +113,18 @@ class Share {
       }
     }
 
-    startActivity(chooserIntent);
+    startActivity(chooserIntent, result);
   }
 
-  private void startActivity(Intent intent) {
+  private void startActivity(Intent intent, MethodChannel.Result result) {
+
     if (activity != null) {
-      activity.startActivity(intent);
+      pendingResult = result;
+      activity.startActivityForResult(intent, REQUEST_CODE);
     } else if (context != null) {
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
       context.startActivity(intent);
+      result.success(true);
     } else {
       throw new IllegalStateException("Both context and activity are null");
     }
@@ -220,6 +230,7 @@ class Share {
     throw new IllegalStateException("Both context and activity are null");
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.KITKAT)
   private static void copy(File src, File dst) throws IOException {
     try (InputStream in = new FileInputStream(src)) {
       try (OutputStream out = new FileOutputStream(dst)) {
@@ -231,5 +242,20 @@ class Share {
         }
       }
     }
+  }
+
+
+
+  @Override
+  public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+    if(requestCode == REQUEST_CODE) {
+      if(pendingResult != null) {
+        pendingResult.success(resultCode == Activity.RESULT_OK);
+        pendingResult = null;
+      }
+      return true;
+    }
+
+    return false;
   }
 }
