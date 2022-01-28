@@ -5,13 +5,17 @@
 package dev.fluttercommunity.plus.share;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.util.Map;
+
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.MethodChannel;
 
 /** Plugin method host for presenting a share sheet via Intent */
-public class SharePlusPlugin implements FlutterPlugin, ActivityAware {
+public class SharePlusPlugin implements FlutterPlugin, ActivityAware, MethodInvoker {
 
   private static final String CHANNEL = "dev.fluttercommunity.plus/share";
   private Share share;
@@ -22,8 +26,9 @@ public class SharePlusPlugin implements FlutterPlugin, ActivityAware {
   public void onAttachedToEngine(FlutterPluginBinding binding) {
     methodChannel = new MethodChannel(binding.getBinaryMessenger(), CHANNEL);
     share = new Share(binding.getApplicationContext(), null);
-    MethodCallHandler handler = new MethodCallHandler(share);
+    MethodCallHandler handler = new MethodCallHandler(share, this);
     methodChannel.setMethodCallHandler(handler);
+
   }
 
   @Override
@@ -54,5 +59,13 @@ public class SharePlusPlugin implements FlutterPlugin, ActivityAware {
   @Override
   public void onDetachedFromActivityForConfigChanges() {
     onDetachedFromActivity();
+  }
+
+
+  @Override
+  public void invokeMethod(@NonNull String method, @Nullable Object arguments) {
+    if(methodChannel != null) {
+      methodChannel.invokeMethod(method, arguments);
+    }
   }
 }

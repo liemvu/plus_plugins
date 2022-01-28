@@ -10,11 +10,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
-import android.os.Build;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.core.content.FileProvider;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -24,17 +23,20 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry;
+
+interface ShareCallback {
+  boolean onShared(int requestCode, boolean result);
+}
+
 
 /** Handles share intent. */
 class Share implements PluginRegistry.ActivityResultListener {
-  public static int REQUEST_CODE = 5001;
   private final Context context;
   private Activity activity;
+  private ShareCallback callback;
 
   private final String providerAuthority;
-  MethodChannel.Result pendingResult;
 
   /**
    * Constructs a Share object. The {@code context} and {@code activity} are used to start the share
@@ -56,7 +58,7 @@ class Share implements PluginRegistry.ActivityResultListener {
     this.activity = activity;
   }
 
-  void share(String text, String subject, MethodChannel.Result result) {
+  void share(int requestCode, String text, String subject) {
     if (text == null || text.isEmpty()) {
       throw new IllegalArgumentException("Non-empty text expected");
     }
@@ -67,10 +69,11 @@ class Share implements PluginRegistry.ActivityResultListener {
     shareIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
     shareIntent.setType("text/plain");
     Intent chooserIntent = Intent.createChooser(shareIntent, null /* dialog title optional */);
-    startActivity(chooserIntent, result);
+    startActivity(requestCode, chooserIntent);
   }
 
-  void shareFiles(List<String> paths, List<String> mimeTypes, String text, String subject, MethodChannel.Result result)
+
+  void shareFiles(int requestCode, List<String> paths, List<String> mimeTypes, String text, String subject)
       throws IOException {
     if (paths == null || paths.isEmpty()) {
       throw new IllegalArgumentException("Non-empty path expected");
@@ -81,7 +84,7 @@ class Share implements PluginRegistry.ActivityResultListener {
 
     Intent shareIntent = new Intent();
     if (fileUris.isEmpty()) {
-      share(text, subject, result);
+      share(requestCode, text, subject);
       return;
     } else if (fileUris.size() == 1) {
       shareIntent.setAction(Intent.ACTION_SEND);
@@ -113,18 +116,19 @@ class Share implements PluginRegistry.ActivityResultListener {
       }
     }
 
-    startActivity(chooserIntent, result);
+    startActivity(requestCode, chooserIntent);
   }
 
-  private void startActivity(Intent intent, MethodChannel.Result result) {
+  private void startActivity(int requestCode, Intent intent) {
 
     if (activity != null) {
-      pendingResult = result;
-      activity.startActivityForResult(intent, REQUEST_CODE);
+      activity.startActivityForResult(intent, requestCode);
     } else if (context != null) {
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
       context.startActivity(intent);
-      result.success(true);
+      if(callback != null) {
+        callback.onShared(requestCode, true);
+      }
     } else {
       throw new IllegalStateException("Both context and activity are null");
     }
@@ -230,7 +234,6 @@ class Share implements PluginRegistry.ActivityResultListener {
     throw new IllegalStateException("Both context and activity are null");
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.KITKAT)
   private static void copy(File src, File dst) throws IOException {
     try (InputStream in = new FileInputStream(src)) {
       try (OutputStream out = new FileOutputStream(dst)) {
@@ -248,14 +251,15 @@ class Share implements PluginRegistry.ActivityResultListener {
 
   @Override
   public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
-    if(requestCode == REQUEST_CODE) {
-      if(pendingResult != null) {
-        pendingResult.success(resultCode == Activity.RESULT_OK);
-        pendingResult = null;
-      }
-      return true;
+    if(callback != null) {
+      boolean isSuccess = resultCode == Activity.RESULT_OK || resultCode == Activity.RESULT_CANCELED;
+      return callback.onShared(requestCode, isSuccess);
     }
 
     return false;
+  }
+
+  public void setCallback(ShareCallback callback) {
+    this.callback = callback;
   }
 }

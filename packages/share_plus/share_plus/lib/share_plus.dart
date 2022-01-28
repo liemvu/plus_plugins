@@ -26,16 +26,20 @@ class Share {
   ///
   /// May throw [PlatformException] or [FormatException]
   /// from [MethodChannel].
-  static Future<void> share(
+  ///
+  /// Returns true on share success
+  static Future<dynamic> share(
     String text, {
     String? subject,
     Rect? sharePositionOrigin,
+    Duration timeout = const Duration(milliseconds: 60000),
   }) {
     assert(text.isNotEmpty);
     return _platform.share(
       text,
       subject: subject,
       sharePositionOrigin: sharePositionOrigin,
+      timeout: timeout,
     );
   }
 
@@ -62,12 +66,15 @@ class Share {
   ///
   /// May throw [PlatformException] or [FormatException]
   /// from [MethodChannel].
-  static Future<void> shareFiles(
+  ///
+  ///  Returns true on share success
+  static Future<dynamic> shareFiles(
     List<String> paths, {
     List<String>? mimeTypes,
     String? subject,
     String? text,
     Rect? sharePositionOrigin,
+    Duration timeout = const Duration(milliseconds: 60000),
   }) {
     assert(paths.isNotEmpty);
     assert(paths.every((element) => element.isNotEmpty));
@@ -77,6 +84,7 @@ class Share {
       subject: subject,
       text: text,
       sharePositionOrigin: sharePositionOrigin,
+      timeout: timeout,
     );
   }
 }

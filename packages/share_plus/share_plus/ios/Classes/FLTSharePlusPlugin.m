@@ -6,7 +6,7 @@
 #import "LinkPresentation/LPLinkMetadata.h"
 
 static NSString *const PLATFORM_CHANNEL = @"dev.fluttercommunity.plus/share";
-
+typedef FlutterResult FLTShareCallback;
 static UIViewController *RootViewController() {
   return [UIApplication sharedApplication].keyWindow.rootViewController;
 }
@@ -126,19 +126,26 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
       [FlutterMethodChannel methodChannelWithName:PLATFORM_CHANNEL
                                   binaryMessenger:registrar.messenger];
 
+  static NSInteger requestCount = 0;
   [shareChannel setMethodCallHandler:^(FlutterMethodCall *call, FlutterResult result) {
+    requestCount += 1;
     NSDictionary *arguments = [call arguments];
     NSNumber *originX = arguments[@"originX"];
     NSNumber *originY = arguments[@"originY"];
     NSNumber *originWidth = arguments[@"originWidth"];
     NSNumber *originHeight = arguments[@"originHeight"];
-
+    NSString *requestCode = [NSString stringWithFormat:@"%ld", (long)requestCount];
+    FlutterMethodChannel *callbackChannel = [FlutterMethodChannel
+                                     methodChannelWithName:PLATFORM_CHANNEL
+                                binaryMessenger:registrar.messenger];
+    
     CGRect originRect = CGRectZero;
     if (originX && originY && originWidth && originHeight) {
       originRect = CGRectMake([originX doubleValue], [originY doubleValue],
                               [originWidth doubleValue], [originHeight doubleValue]);
     }
-
+    
+    
     if ([@"share" isEqualToString:call.method]) {
       NSString *shareText = arguments[@"text"];
       NSString *shareSubject = arguments[@"subject"];
@@ -156,7 +163,14 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
                  subject:shareSubject
           withController:topViewController
                 atSource:originRect
-               result:result];
+          onCompleted:^(id  _Nullable result) {
+        
+        [callbackChannel invokeMethod:@"shareCallback" arguments:@{
+          @"requestCode": requestCode,
+          @"result": result
+        }];
+      }];
+      result(requestCode);
     } else if ([@"shareFiles" isEqualToString:call.method]) {
       NSArray *paths = arguments[@"paths"];
       NSArray *mimeTypes = arguments[@"mimeTypes"];
@@ -187,7 +201,13 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
                 withText:text
           withController:topViewController
               atSource:originRect
-                result:result];
+           onCompleted:^(id  _Nullable result) {
+        [callbackChannel invokeMethod:@"shareFilesCallback" arguments:@{
+          @"requestCode": requestCode,
+          @"result": result
+        }];
+      }];
+      result(requestCode);
     } else {
       result(FlutterMethodNotImplemented);
     }
@@ -197,7 +217,7 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
 + (void)share:(NSArray *)shareItems
     withController:(UIViewController *)controller
           atSource:(CGRect)origin
-       result:(FlutterResult)result {
+       onCompleted:(FLTShareCallback)onCompleted {
   UIActivityViewController *activityViewController =
       [[UIActivityViewController alloc] initWithActivityItems:shareItems applicationActivities:nil];
   activityViewController.popoverPresentationController.sourceView = controller.view;
@@ -214,7 +234,7 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
                                                         )
   {
     tmp.completionWithItemsHandler = nil;
-    result([NSNumber numberWithBool:completed]);
+    onCompleted([NSNumber numberWithBool:completed]);
   };
   
   [controller presentViewController:activityViewController animated:YES completion:nil];
@@ -224,12 +244,12 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
            subject:(NSString *)subject
     withController:(UIViewController *)controller
           atSource:(CGRect)origin
-            result:(FlutterResult) result{
+      onCompleted:(FLTShareCallback) onCompleted{
   NSObject *data = [[NSURL alloc] initWithString:shareText];
   if (data == nil) {
     data = [[SharePlusData alloc] initWithSubject:subject text:shareText];
   }
-  [self share:@[ data ] withController:controller atSource:origin result:result];
+  [self share:@[ data ] withController:controller atSource:origin onCompleted:onCompleted];
 }
 
 + (void)shareFiles:(NSArray *)paths
@@ -238,7 +258,7 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
           withText:(NSString *)text
     withController:(UIViewController *)controller
           atSource:(CGRect)origin
-            result:(FlutterResult) result {
+       onCompleted:(FLTShareCallback) onCompleted {
   NSMutableArray *items = [[NSMutableArray alloc] init];
 
   if (text || subject) {
@@ -263,7 +283,7 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
     }
   }
 
-  [self share:items withController:controller atSource:origin result:result];
+  [self share:items withController:controller atSource:origin onCompleted:onCompleted];
 }
 
 @end

@@ -13,18 +13,39 @@ import 'package:share_plus_platform_interface/share_plus_platform_interface.dart
 
 /// Plugin for summoning a platform share sheet.
 class MethodChannelShare extends SharePlatform {
+  final _requests = <String, Completer>{};
+
   /// [MethodChannel] used to communicate with the platform side.
   @visibleForTesting
   static const MethodChannel channel =
       MethodChannel('dev.fluttercommunity.plus/share');
 
+  MethodChannelShare() {
+    channel.setMethodCallHandler(methodCallHandler);
+  }
+
+  Future<dynamic> methodCallHandler(MethodCall? call) async {
+    if (call?.arguments != null &&
+        (call?.method == "shareCallback" ||
+            call?.method == "shareFilesCallback")) {
+      final args = call!.arguments as Map;
+      final code = args["requestCode"];
+      final completer = _requests[code];
+
+      if (completer != null) {
+        completer.complete(args["result"]);
+      }
+    }
+  }
+
   /// Summons the platform's share sheet to share text.
   @override
-  Future<void> share(
+  Future<dynamic> share(
     String text, {
     String? subject,
     Rect? sharePositionOrigin,
-  }) {
+    Duration timeout = const Duration(milliseconds: 60000),
+  }) async {
     assert(text.isNotEmpty);
     final params = <String, dynamic>{
       'text': text,
@@ -37,19 +58,33 @@ class MethodChannelShare extends SharePlatform {
       params['originWidth'] = sharePositionOrigin.width;
       params['originHeight'] = sharePositionOrigin.height;
     }
+    final code = await channel.invokeMethod('share', params);
+    if (code == null || !(code is String)) {
+      return false;
+    }
 
-    return channel.invokeMethod<void>('share', params);
+    final completer = Completer();
+    _requests[code] = completer;
+
+    return Future.any([
+      completer.future,
+      Future.delayed(timeout).then((_) {
+        _requests.remove(code);
+        return false;
+      })
+    ]);
   }
 
   /// Summons the platform's share sheet to share multiple files.
   @override
-  Future<void> shareFiles(
+  Future<dynamic> shareFiles(
     List<String> paths, {
     List<String>? mimeTypes,
     String? subject,
     String? text,
     Rect? sharePositionOrigin,
-  }) {
+    Duration timeout = const Duration(milliseconds: 60000),
+  }) async {
     assert(paths.isNotEmpty);
     assert(paths.every((element) => element.isNotEmpty));
     final params = <String, dynamic>{
@@ -68,7 +103,20 @@ class MethodChannelShare extends SharePlatform {
       params['originHeight'] = sharePositionOrigin.height;
     }
 
-    return channel.invokeMethod('shareFiles', params);
+    final code = await channel.invokeMethod('shareFiles', params);
+    if (code == null || !(code is String)) {
+      return false;
+    }
+
+    final completer = Completer<bool>();
+    _requests[code] = completer;
+    return Future.any([
+      completer.future,
+      Future.delayed(timeout).then((value) {
+        _requests.remove(code);
+        return false;
+      })
+    ]);
   }
 
   static String _mimeTypeForPath(String path) {

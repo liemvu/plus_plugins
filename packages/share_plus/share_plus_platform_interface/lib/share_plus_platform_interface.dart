@@ -31,25 +31,28 @@ class SharePlatform extends PlatformInterface {
   }
 
   /// Share text.
-  Future<void> share(
+  Future<dynamic> share(
     String text, {
     String? subject,
     Rect? sharePositionOrigin,
+    Duration timeout = const Duration(milliseconds: 60000),
   }) {
     return _instance.share(
       text,
       subject: subject,
       sharePositionOrigin: sharePositionOrigin,
+      timeout: timeout,
     );
   }
 
   /// Share files.
-  Future<void> shareFiles(
+  Future<dynamic> shareFiles(
     List<String> paths, {
     List<String>? mimeTypes,
     String? subject,
     String? text,
     Rect? sharePositionOrigin,
+    Duration timeout = const Duration(milliseconds: 60000),
   }) {
     return _instance.shareFiles(
       paths,
@@ -57,6 +60,7 @@ class SharePlatform extends PlatformInterface {
       subject: subject,
       text: text,
       sharePositionOrigin: sharePositionOrigin,
+      timeout: timeout,
     );
   }
 }
