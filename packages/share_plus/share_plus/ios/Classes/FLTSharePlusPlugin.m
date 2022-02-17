@@ -135,9 +135,6 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
     NSNumber *originWidth = arguments[@"originWidth"];
     NSNumber *originHeight = arguments[@"originHeight"];
     NSString *requestCode = [NSString stringWithFormat:@"%ld", (long)requestCount];
-    FlutterMethodChannel *callbackChannel = [FlutterMethodChannel
-                                     methodChannelWithName:PLATFORM_CHANNEL
-                                binaryMessenger:registrar.messenger];
     
     CGRect originRect = CGRectZero;
     if (originX && originY && originWidth && originHeight) {
@@ -165,6 +162,9 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
                 atSource:originRect
           onCompleted:^(id  _Nullable result) {
         
+        FlutterMethodChannel *callbackChannel = [FlutterMethodChannel
+                                methodChannelWithName:PLATFORM_CHANNEL
+                                binaryMessenger:registrar.messenger];
         [callbackChannel invokeMethod:@"shareCallback" arguments:@{
           @"requestCode": requestCode,
           @"result": result
@@ -202,6 +202,10 @@ static UIViewController *TopViewControllerForViewController(UIViewController *vi
           withController:topViewController
               atSource:originRect
            onCompleted:^(id  _Nullable result) {
+
+        FlutterMethodChannel *callbackChannel = [FlutterMethodChannel
+                                methodChannelWithName:PLATFORM_CHANNEL
+                                binaryMessenger:registrar.messenger];
         [callbackChannel invokeMethod:@"shareFilesCallback" arguments:@{
           @"requestCode": requestCode,
           @"result": result
