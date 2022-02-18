@@ -122,6 +122,7 @@ class Share implements PluginRegistry.ActivityResultListener {
   private void startActivity(int requestCode, Intent intent) {
 
     if (activity != null) {
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
       activity.startActivityForResult(intent, requestCode);
     } else if (context != null) {
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
